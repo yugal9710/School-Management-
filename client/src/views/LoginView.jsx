@@ -17,8 +17,7 @@ export default function LoginView({ onLoginSuccess, lang, onToggleLang }) {
     { label: lang === 'ne' ? 'लेखापाल' : 'Accountant', user: 'accountant.sita', pass: 'acc123', role: 'accountant' },
     { label: lang === 'ne' ? 'पुस्तकालयाध्यक्ष' : 'Librarian', user: 'librarian.krishna', pass: 'lib123', role: 'librarian' },
     { label: lang === 'ne' ? 'यातायात' : 'Transport', user: 'transport.hari', pass: 'trans123', role: 'transport_manager' },
-    { label: lang === 'ne' ? 'पालिका शिक्षा अधिकृत' : 'Palika Officer', user: 'palika.lalitpur', pass: 'palika123', role: 'palika_officer' },
-    { label: lang === 'ne' ? 'केन्द्रीय प्रशासक' : 'Platform Super Admin', user: 'superadmin', pass: 'admin123', role: 'super_admin' },
+    { label: lang === 'ne' ? 'पालिका शिक्षा अधिकृत' : 'Palika Officer', user: 'palika.lalitpur', pass: 'palika123', role: 'palika_officer' }
   ];
 
   const handleLogin = async (e) => {
