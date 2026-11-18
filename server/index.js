@@ -3,6 +3,23 @@
  * Multi-Tenant School Management Platform for Nepal
  */
 
+// Auto-enable experimental-sqlite flag if running on Node 22 without it
+try {
+  require('node:sqlite');
+} catch (err) {
+  if (err && err.code === 'ERR_UNKNOWN_BUILTIN_MODULE') {
+    const { spawn } = require('node:child_process');
+    const child = spawn(process.execPath, ['--experimental-sqlite', ...process.argv.slice(1)], {
+      stdio: 'inherit',
+      env: process.env
+    });
+    child.on('exit', (code, signal) => {
+      process.exit(code !== null ? code : (signal ? 1 : 0));
+    });
+    return;
+  }
+}
+
 const express = require('express');
 const cors = require('cors');
 const path = require('node:path');

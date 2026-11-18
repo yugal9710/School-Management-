@@ -318,7 +318,7 @@ export default function AdminConsoleView({ token, lang = 'ne', tenant, user, onO
             <span>{lang === 'ne' ? 'डाटाब्याकअप (JSON)' : 'Database Backup'}</span>
           </button>
 
-          {onOpenDevConsole && (
+          {onOpenDevConsole && user?.role === 'super_admin' && (
             <button
               onClick={onOpenDevConsole}
               className="btn btn-sm"

@@ -1,30 +1,10 @@
 /**
  * SQLite Database Connection and Schema initialization
- * Universal SQLite Support: Node native node:sqlite or better-sqlite3
+ * Powered by Node.js native node:sqlite DatabaseSync
  * Multi-tenant architecture with row-level tenant_id isolation
  */
 
-let Database;
-let sqliteEngineName = 'node:sqlite';
-
-try {
-  const sqlite = require('node:sqlite');
-  if (sqlite && sqlite.DatabaseSync) {
-    Database = sqlite.DatabaseSync;
-    sqliteEngineName = 'node:sqlite (DatabaseSync)';
-  } else {
-    throw new Error('DatabaseSync not found on node:sqlite');
-  }
-} catch (err) {
-  try {
-    Database = require('better-sqlite3');
-    sqliteEngineName = 'better-sqlite3';
-  } catch (err2) {
-    console.error('Fatal: Could not load node:sqlite or better-sqlite3:', err, err2);
-    throw err;
-  }
-}
-
+const { DatabaseSync } = require('node:sqlite');
 const path = require('node:path');
 const fs = require('node:fs');
 const bcrypt = require('bcryptjs');
@@ -35,7 +15,8 @@ if (!fs.existsSync(dbDir)) {
 }
 
 const dbPath = path.join(dbDir, 'school_management.db');
-const db = new Database(dbPath);
+const db = new DatabaseSync(dbPath);
+const sqliteEngineName = 'node:sqlite (DatabaseSync)';
 
 console.log(`[Database] Initialized SQLite database engine: ${sqliteEngineName}`);
 

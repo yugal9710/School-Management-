@@ -223,33 +223,35 @@ export default function Navbar({
             <span>{lang === 'ne' ? 'English' : 'नेपाली'}</span>
           </button>
 
-          {/* Developer Console Pill Button (Matches design in prompt attachment) */}
-          <button
-            onClick={onOpenDevConsole}
-            id="btn-developer-console"
-            title="Open Developer Console (SQL, Schema, Metrics & Dental Diagnostics)"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.45rem',
-              padding: '0.4rem 1rem',
-              backgroundColor: '#2563eb',
-              color: '#ffffff',
-              border: 'none',
-              borderRadius: '9999px',
-              fontSize: '0.82rem',
-              fontWeight: 600,
-              cursor: 'pointer',
-              boxShadow: '0 2px 4px rgba(37, 99, 235, 0.25)',
-              transition: 'background-color 0.15s ease, transform 0.1s ease',
-              whiteSpace: 'nowrap'
-            }}
-            onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
-            onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-          >
-            <Server size={14} color="#ffffff" strokeWidth={2.2} />
-            <span>Developer Console</span>
-          </button>
+          {/* Developer Console Pill Button: ONLY available for Super Admin / Software Owner */}
+          {user?.role === 'super_admin' && (
+            <button
+              onClick={onOpenDevConsole}
+              id="btn-developer-console"
+              title="Open Developer Console (Super Admin / Software Owner)"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '0.45rem',
+                padding: '0.4rem 1rem',
+                backgroundColor: '#2563eb',
+                color: '#ffffff',
+                border: 'none',
+                borderRadius: '9999px',
+                fontSize: '0.82rem',
+                fontWeight: 600,
+                cursor: 'pointer',
+                boxShadow: '0 2px 4px rgba(37, 99, 235, 0.25)',
+                transition: 'background-color 0.15s ease, transform 0.1s ease',
+                whiteSpace: 'nowrap'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+            >
+              <Server size={14} color="#ffffff" strokeWidth={2.2} />
+              <span>Developer Console</span>
+            </button>
+          )}
 
           {/* User Profile & Role Tag */}
           <div style={{
