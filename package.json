@@ -6,8 +6,11 @@
   "scripts": {
     "start": "node server/index.js",
     "dev": "node server/index.js",
-    "build": "npm --prefix client run build",
+    "build": "npm --prefix client install --include=dev && npm --prefix client run build",
     "test": "node tests/system.test.js"
+  },
+  "engines": {
+    "node": ">=22.5.0"
   },
   "keywords": [
     "nepal",
