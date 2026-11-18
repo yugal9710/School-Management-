@@ -1,10 +1,30 @@
 /**
  * SQLite Database Connection and Schema initialization
- * Powered by Node.js 24 native node:sqlite DatabaseSync
+ * Universal SQLite Support: Node native node:sqlite or better-sqlite3
  * Multi-tenant architecture with row-level tenant_id isolation
  */
 
-const { DatabaseSync } = require('node:sqlite');
+let Database;
+let sqliteEngineName = 'node:sqlite';
+
+try {
+  const sqlite = require('node:sqlite');
+  if (sqlite && sqlite.DatabaseSync) {
+    Database = sqlite.DatabaseSync;
+    sqliteEngineName = 'node:sqlite (DatabaseSync)';
+  } else {
+    throw new Error('DatabaseSync not found on node:sqlite');
+  }
+} catch (err) {
+  try {
+    Database = require('better-sqlite3');
+    sqliteEngineName = 'better-sqlite3';
+  } catch (err2) {
+    console.error('Fatal: Could not load node:sqlite or better-sqlite3:', err, err2);
+    throw err;
+  }
+}
+
 const path = require('node:path');
 const fs = require('node:fs');
 const bcrypt = require('bcryptjs');
@@ -15,7 +35,9 @@ if (!fs.existsSync(dbDir)) {
 }
 
 const dbPath = path.join(dbDir, 'school_management.db');
-const db = new DatabaseSync(dbPath);
+const db = new Database(dbPath);
+
+console.log(`[Database] Initialized SQLite database engine: ${sqliteEngineName}`);
 
 // Enable WAL mode and foreign keys for high performance and integrity
 db.exec('PRAGMA journal_mode = WAL;');
@@ -1106,5 +1128,6 @@ seedInitialData();
 seedDentalData();
 
 module.exports = {
-  db
+  db,
+  sqliteEngineName
 };

@@ -8,7 +8,7 @@ const express = require('express');
 const router = express.Router();
 const fs = require('node:fs');
 const path = require('node:path');
-const { db } = require('../db/database');
+const { db, sqliteEngineName } = require('../db/database');
 const { authenticateToken, requireRoles, logAudit } = require('../middleware/auth');
 
 // Allow developer console access for authenticated users (or super_admin / school_admin)
@@ -132,7 +132,7 @@ router.get('/stats', (req, res) => {
         }
       },
       database: {
-        engine: 'Node.js 24 native node:sqlite (DatabaseSync)',
+        engine: `Node.js ${process.version} - ${sqliteEngineName || 'SQLite Engine'}`,
         fileSizeKb: dbSizeKb,
         journalMode: 'WAL',
         foreignKeys: 'ON'
