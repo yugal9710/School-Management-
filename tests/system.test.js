@@ -183,6 +183,46 @@ test('Super Admin and Palika Education Officer accounts exist and passwords hash
   assert.ok(bcrypt.compareSync('palika123', palika.password_hash));
 });
 
+// 6. Class Grade Level Configuration & Validation Tests
+test('Class Grade configuration: Grade level is saved, viewed, and editable across supported tiers (ECD to Grade 12)', () => {
+  const testTenantId = 'shree-shanti-sec';
+  const testClassId = 'cls-test-grade-' + Date.now();
+
+  // Test 1: Save class with Grade 10 (Secondary Level)
+  db.prepare(`
+    INSERT INTO classes (id, tenant_id, name, nepali_name, grade_level, stream, display_order)
+    VALUES (?, ?, 'Test Grade 10', 'परीक्षण कक्षा १०', 10, 'General', 10)
+  `).run(testClassId, testTenantId);
+
+  let savedClass = db.prepare('SELECT * FROM classes WHERE id = ?').get(testClassId);
+  assert.strictEqual(savedClass.grade_level, 10, 'Saved class should store configured Class grade 10');
+  assert.strictEqual(savedClass.name, 'Test Grade 10');
+
+  // Test 2: Edit / change class grade level to Grade 11 (Higher Secondary)
+  db.prepare(`
+    UPDATE classes
+    SET name = 'Test Grade 11', nepali_name = 'परीक्षण कक्षा ११', grade_level = 11, stream = 'Science'
+    WHERE id = ?
+  `).run(testClassId);
+
+  let updatedClass = db.prepare('SELECT * FROM classes WHERE id = ?').get(testClassId);
+  assert.strictEqual(updatedClass.grade_level, 11, 'Class grade should be editable and updated to Grade 11');
+  assert.strictEqual(updatedClass.stream, 'Science');
+
+  // Test 3: Configure ECD / Pre-Primary (grade_level = 0)
+  const ecdClassId = 'cls-test-ecd-' + Date.now();
+  db.prepare(`
+    INSERT INTO classes (id, tenant_id, name, nepali_name, grade_level, stream, display_order)
+    VALUES (?, ?, 'ECD Nursery', 'शिशु कक्षा', 0, 'General', 0)
+  `).run(ecdClassId, testTenantId);
+
+  const ecdClass = db.prepare('SELECT * FROM classes WHERE id = ?').get(ecdClassId);
+  assert.strictEqual(ecdClass.grade_level, 0, 'ECD Class grade 0 must be preserved correctly');
+
+  // Clean up test records
+  db.prepare('DELETE FROM classes WHERE id IN (?, ?)').run(testClassId, ecdClassId);
+});
+
 console.log(`\nResults: ${passedTests}/${totalTests} tests passed.\n`);
 if (passedTests === totalTests) {
   console.log('ALL NEPAL SCHOOL MANAGEMENT SYSTEM TESTS PASSED SUCCESSFULLY!\n');

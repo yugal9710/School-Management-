@@ -46,11 +46,32 @@ router.post('/classes', authenticateToken, requireRoles('school_admin', 'super_a
     return res.status(400).json({ error: 'Class name and Nepali name required' });
   }
 
+  if (grade_level === undefined || grade_level === null || grade_level === '') {
+    return res.status(400).json({
+      error: 'Class grade is required to configure CDC curriculum standards and IEMIS reporting codes.'
+    });
+  }
+
+  const parsedGrade = parseInt(grade_level, 10);
+  if (isNaN(parsedGrade) || parsedGrade < 0 || parsedGrade > 12) {
+    return res.status(400).json({
+      error: 'Invalid Class grade. Grade level must be between 0 (ECD/Pre-Primary) and 12.'
+    });
+  }
+
   const classId = 'cls-' + Date.now();
   db.prepare(`
     INSERT INTO classes (id, tenant_id, name, nepali_name, grade_level, stream, display_order)
     VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).run(classId, tenantId, name, nepali_name, grade_level || 1, stream || 'General', display_order || 1);
+  `).run(
+    classId,
+    tenantId,
+    name,
+    nepali_name,
+    parsedGrade,
+    stream || 'General',
+    display_order ? parseInt(display_order, 10) : (parsedGrade === 0 ? 0 : parsedGrade)
+  );
 
   // Auto-create Section A
   const secId = 'sec-' + Date.now();
@@ -59,8 +80,69 @@ router.post('/classes', authenticateToken, requireRoles('school_admin', 'super_a
     VALUES (?, ?, ?, 'Section A', 'Room 101', 40)
   `).run(secId, tenantId, classId);
 
-  logAudit(req, 'CREATE_CLASS', 'class', classId, { name, nepali_name });
-  res.status(201).json({ message: 'Class created', id: classId });
+  logAudit(req, 'CREATE_CLASS', 'class', classId, { name, nepali_name, grade_level: parsedGrade });
+  res.status(201).json({ message: 'Class created successfully', id: classId, grade_level: parsedGrade });
+});
+
+// PUT /api/academics/classes/:id - Update class details and grade level
+router.put('/classes/:id', authenticateToken, requireRoles('school_admin', 'super_admin'), (req, res) => {
+  const tenantId = req.tenantId;
+  const { id } = req.params;
+  const { name, nepali_name, grade_level, stream, display_order } = req.body;
+
+  const existing = db.prepare('SELECT * FROM classes WHERE id = ? AND tenant_id = ?').get(id, tenantId);
+  if (!existing) {
+    return res.status(404).json({ error: 'Class not found' });
+  }
+
+  if (!name || !nepali_name) {
+    return res.status(400).json({ error: 'Class name and Nepali name required' });
+  }
+
+  if (grade_level === undefined || grade_level === null || grade_level === '') {
+    return res.status(400).json({
+      error: 'Class grade is required to configure CDC curriculum standards and IEMIS reporting codes.'
+    });
+  }
+
+  const parsedGrade = parseInt(grade_level, 10);
+  if (isNaN(parsedGrade) || parsedGrade < 0 || parsedGrade > 12) {
+    return res.status(400).json({
+      error: 'Invalid Class grade. Grade level must be between 0 (ECD/Pre-Primary) and 12.'
+    });
+  }
+
+  db.prepare(`
+    UPDATE classes 
+    SET name = ?, nepali_name = ?, grade_level = ?, stream = ?, display_order = ?
+    WHERE id = ? AND tenant_id = ?
+  `).run(
+    name,
+    nepali_name,
+    parsedGrade,
+    stream || existing.stream || 'General',
+    display_order !== undefined ? parseInt(display_order, 10) : existing.display_order,
+    id,
+    tenantId
+  );
+
+  logAudit(req, 'UPDATE_CLASS', 'class', id, {
+    old_grade: existing.grade_level,
+    new_grade: parsedGrade,
+    name,
+    nepali_name
+  });
+
+  res.json({
+    message: 'Class grade and details updated successfully',
+    class: {
+      id,
+      name,
+      nepali_name,
+      grade_level: parsedGrade,
+      stream: stream || existing.stream || 'General'
+    }
+  });
 });
 
 // GET /api/academics/subjects - List subjects (optionally by class_id)
