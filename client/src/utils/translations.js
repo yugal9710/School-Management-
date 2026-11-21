@@ -316,13 +316,13 @@ export const translations = {
 };
 
 export const NEPAL_PROVINCES = [
-  { code: 'p1', nameEn: 'Koshi Province', nameNe: 'कोशी प्रदेश' },
-  { code: 'p2', nameEn: 'Madhesh Province', nameNe: 'मधेश प्रदेश' },
-  { code: 'p3', nameEn: 'Bagmati Province', nameNe: 'बागमती प्रदेश' },
-  { code: 'p4', nameEn: 'Gandaki Province', nameNe: 'गण्डकी प्रदेश' },
-  { code: 'p5', nameEn: 'Lumbini Province', nameNe: 'लुम्बिनी प्रदेश' },
-  { code: 'p6', nameEn: 'Karnali Province', nameNe: 'कर्णाली प्रदेश' },
-  { code: 'p7', nameEn: 'Sudurpashchim Province', nameNe: 'सुदूरपश्चिम प्रदेश' }
+  { code: 'p1', id: 'Koshi', nameEn: 'Koshi Province', nameNe: 'कोशी प्रदेश' },
+  { code: 'p2', id: 'Madhesh', nameEn: 'Madhesh Province', nameNe: 'मधेश प्रदेश' },
+  { code: 'p3', id: 'Bagmati', nameEn: 'Bagmati Province', nameNe: 'बागमती प्रदेश' },
+  { code: 'p4', id: 'Gandaki', nameEn: 'Gandaki Province', nameNe: 'गण्डकी प्रदेश' },
+  { code: 'p5', id: 'Lumbini', nameEn: 'Lumbini Province', nameNe: 'लुम्बिनी प्रदेश' },
+  { code: 'p6', id: 'Karnali', nameEn: 'Karnali Province', nameNe: 'कर्णाली प्रदेश' },
+  { code: 'p7', id: 'Sudurpashchim', nameEn: 'Sudurpashchim Province', nameNe: 'सुदूरपश्चिम प्रदेश' }
 ];
 
 export const NEPAL_DISTRICTS = [

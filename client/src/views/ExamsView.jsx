@@ -376,8 +376,10 @@ export default function ExamsView({ token, lang = 'ne', tenant, user }) {
                 const cid = e.target.value;
                 setSelectedClassId(cid);
                 const cObj = classes.find(c => c.id === cid);
-                if (cObj && cObj.sections.length > 0) {
+                if (cObj && cObj.sections && cObj.sections.length > 0) {
                   setSelectedSectionId(cObj.sections[0].id);
+                } else {
+                  setSelectedSectionId('');
                 }
               }}
               className="form-select"
@@ -398,9 +400,13 @@ export default function ExamsView({ token, lang = 'ne', tenant, user }) {
               onChange={(e) => setSelectedSectionId(e.target.value)}
               className="form-select"
             >
-              {classes.find(c => c.id === selectedClassId)?.sections?.map(s => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
+              {classes.find(c => c.id === selectedClassId)?.sections && classes.find(c => c.id === selectedClassId).sections.length > 0 ? (
+                classes.find(c => c.id === selectedClassId).sections.map(s => (
+                  <option key={s.id} value={s.id}>{s.name}</option>
+                ))
+              ) : (
+                <option value="">{lang === 'ne' ? '-- खण्ड उपलब्ध छैन --' : '-- No sections available --'}</option>
+              )}
             </select>
           </div>
 

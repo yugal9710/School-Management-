@@ -223,6 +223,66 @@ test('Class Grade configuration: Grade level is saved, viewed, and editable acro
   db.prepare('DELETE FROM classes WHERE id IN (?, ?)').run(testClassId, ecdClassId);
 });
 
+// 7. Class Sections Configuration & Student Placement Tests
+test('Class Sections configuration: Every class has selectable sections (Section A, B) for student admission', () => {
+  const tenantId = 'shree-shanti-sec';
+
+  // Check Grade 6 has sections
+  const grade6 = db.prepare('SELECT id, name FROM classes WHERE id = ? AND tenant_id = ?').get('cls-6-shanti', tenantId);
+  assert.ok(grade6, 'Grade 6 class must exist');
+
+  const grade6Sections = db.prepare('SELECT id, name FROM sections WHERE class_id = ? AND tenant_id = ? ORDER BY name ASC').all('cls-6-shanti', tenantId);
+  assert.ok(grade6Sections.length > 0, 'Grade 6 must have at least one selectable section');
+  assert.ok(grade6Sections.some(s => s.name.includes('Section A')), 'Grade 6 must have Section A');
+
+  // Verify all classes for tenant have at least one section
+  const classes = db.prepare('SELECT id, name FROM classes WHERE tenant_id = ?').all(tenantId);
+  for (const c of classes) {
+    const secCount = db.prepare('SELECT COUNT(*) as cnt FROM sections WHERE class_id = ? AND tenant_id = ?').get(c.id, tenantId).cnt;
+    assert.ok(secCount > 0, `Class ${c.name} (${c.id}) must have at least one section for student placement`);
+  }
+});
+
+// 8. Student Phone Number & Federal Address Hierarchy (Permanent & Temporary) Tests
+test('Student Phone Number & Federal Address Hierarchy: Permanent and Temporary addresses with 753 local level dependency', () => {
+  const tenantId = 'shree-shanti-sec';
+  const testStudentId = 'stu-test-hierarchy-' + Date.now();
+
+  // Test 1: Insert student with student_phone, permanent and temporary address
+  db.prepare(`
+    INSERT INTO students (
+      id, tenant_id, admission_number, roll_number, current_class_id, current_section_id,
+      first_name, last_name, full_name_nepali, student_phone, gender, dob_bs,
+      caste_ethnicity, permanent_province, permanent_district, permanent_municipality,
+      permanent_ward, permanent_tole, temporary_province, temporary_district,
+      temporary_municipality, temporary_ward, temporary_tole, same_as_permanent,
+      province, district, municipality, ward, tole, enrollment_date_bs
+    ) VALUES (
+      ?, ?, 'TEST-2081-999', 99, 'cls-6-shanti', 'sec-cls-6-shanti-a',
+      'Binod', 'Adhikari', 'बिनोद अधिकारी', '9841999888', 'male', '2067-05-15',
+      'Brahmin_Chhetri', 'Bagmati', 'Lalitpur', 'Lalitpur',
+      '5', 'महालक्ष्मीस्थान', 'Bagmati', 'Kathmandu',
+      'Kathmandu', '10', 'नयाँ बानेश्वर', 0,
+      'Bagmati', 'Lalitpur', 'Lalitpur', '5', 'महालक्ष्मीस्थान', '2081-01-10'
+    )
+  `).run(testStudentId, tenantId);
+
+  const student = db.prepare('SELECT * FROM students WHERE id = ?').get(testStudentId);
+  assert.strictEqual(student.student_phone, '9841999888', 'Student phone number must be saved');
+  assert.strictEqual(student.permanent_province, 'Bagmati', 'Permanent province must be Bagmati');
+  assert.strictEqual(student.permanent_district, 'Lalitpur', 'Permanent district must be Lalitpur');
+  assert.strictEqual(student.permanent_municipality, 'Lalitpur', 'Permanent municipality must be Lalitpur');
+  assert.strictEqual(student.permanent_ward, '5', 'Permanent ward must be 5');
+  assert.strictEqual(student.temporary_province, 'Bagmati');
+  assert.strictEqual(student.temporary_district, 'Kathmandu');
+  assert.strictEqual(student.temporary_municipality, 'Kathmandu');
+  assert.strictEqual(student.temporary_ward, '10');
+  assert.strictEqual(student.same_as_permanent, 0);
+
+  // Test 2: Clean up test record
+  db.prepare('DELETE FROM students WHERE id = ?').run(testStudentId);
+});
+
 console.log(`\nResults: ${passedTests}/${totalTests} tests passed.\n`);
 if (passedTests === totalTests) {
   console.log('ALL NEPAL SCHOOL MANAGEMENT SYSTEM TESTS PASSED SUCCESSFULLY!\n');

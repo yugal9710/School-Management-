@@ -23,7 +23,20 @@ router.get('/classes', authenticateToken, (req, res) => {
   const classes = db.prepare('SELECT * FROM classes WHERE tenant_id = ? ORDER BY display_order ASC').all(tenantId);
 
   const result = classes.map(c => {
-    const sections = db.prepare('SELECT * FROM sections WHERE tenant_id = ? AND class_id = ? ORDER BY name ASC').all(tenantId, c.id);
+    let sections = db.prepare('SELECT * FROM sections WHERE tenant_id = ? AND class_id = ? ORDER BY name ASC').all(tenantId, c.id);
+    if (!sections || sections.length === 0) {
+      // Auto-create standard Section A if none exists
+      const secAId = `sec-${c.id}-a`;
+      try {
+        db.prepare(`
+          INSERT OR IGNORE INTO sections (id, tenant_id, class_id, name, room_number, capacity)
+          VALUES (?, ?, ?, 'Section A (सगरमाथा)', ?, 40)
+        `).run(secAId, tenantId, c.id, `R-${c.display_order || 1}01`);
+        sections = db.prepare('SELECT * FROM sections WHERE tenant_id = ? AND class_id = ? ORDER BY name ASC').all(tenantId, c.id);
+      } catch (err) {
+        console.warn('Auto-create section fallback error:', err.message);
+      }
+    }
     const subjectsCount = db.prepare('SELECT COUNT(*) as cnt FROM subjects WHERE tenant_id = ? AND class_id = ?').get(tenantId, c.id).cnt;
     const studentCount = db.prepare("SELECT COUNT(*) as cnt FROM students WHERE tenant_id = ? AND current_class_id = ? AND status = 'enrolled'").get(tenantId, c.id).cnt;
     return {
@@ -35,6 +48,29 @@ router.get('/classes', authenticateToken, (req, res) => {
   });
 
   res.json(result);
+});
+
+// POST /api/academics/sections - Add a new section to a class
+router.post('/sections', authenticateToken, requireRoles('school_admin', 'super_admin'), (req, res) => {
+  const tenantId = req.tenantId;
+  const { class_id, name, room_number, capacity } = req.body;
+  if (!class_id || !name) {
+    return res.status(400).json({ error: 'Class ID and section name are required' });
+  }
+
+  const cls = db.prepare('SELECT id, name FROM classes WHERE id = ? AND tenant_id = ?').get(class_id, tenantId);
+  if (!cls) {
+    return res.status(404).json({ error: 'Class not found' });
+  }
+
+  const secId = 'sec-' + Date.now();
+  db.prepare(`
+    INSERT INTO sections (id, tenant_id, class_id, name, room_number, capacity)
+    VALUES (?, ?, ?, ?, ?, ?)
+  `).run(secId, tenantId, class_id, name.trim(), room_number || 'Room 101', capacity ? parseInt(capacity, 10) : 40);
+
+  logAudit(req, 'CREATE_SECTION', 'section', secId, { class_id, name, room_number });
+  res.status(201).json({ message: 'Section created successfully', id: secId });
 });
 
 // POST /api/academics/classes - Create new class / grade

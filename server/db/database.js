@@ -168,6 +168,18 @@ function initSchema() {
       disability_status TEXT DEFAULT 'none' CHECK(disability_status IN ('none', 'physical', 'visual', 'hearing', 'intellectual', 'multiple')),
       inclusion_support_notes TEXT, -- Sensitive support details
       previous_school TEXT,
+      student_phone TEXT,
+      permanent_province TEXT,
+      permanent_district TEXT,
+      permanent_municipality TEXT,
+      permanent_ward TEXT,
+      permanent_tole TEXT,
+      temporary_province TEXT,
+      temporary_district TEXT,
+      temporary_municipality TEXT,
+      temporary_ward TEXT,
+      temporary_tole TEXT,
+      same_as_permanent INTEGER DEFAULT 1,
       province TEXT NOT NULL,
       district TEXT NOT NULL,
       municipality TEXT NOT NULL,
@@ -651,11 +663,21 @@ function seedInitialData() {
     );
   }
 
-  // Sections for Grade 10
-  const sec10A = 'sec-10a-shanti';
-  const sec10B = 'sec-10b-shanti';
-  db.prepare(`INSERT INTO sections (id, tenant_id, class_id, name, room_number, class_teacher_id, capacity) VALUES (?, ?, 'cls-10-shanti', 'Section A (सगरमाथा)', 'R-201', 'usr-teacher-ram', 40)`).run(sec10A, tenant1Id);
-  db.prepare(`INSERT INTO sections (id, tenant_id, class_id, name, room_number, class_teacher_id, capacity) VALUES (?, ?, 'cls-10-shanti', 'Section B (कञ्चनजङ्घा)', 'R-202', NULL, 40)`).run(sec10B, tenant1Id);
+  // Sections for all classes
+  const seedSections = [
+    { classId: 'cls-10-shanti', a: 'sec-10a-shanti', b: 'sec-10b-shanti', r1: 'R-201', r2: 'R-202', teacher: 'usr-teacher-ram' },
+    { classId: 'cls-9-shanti', a: 'sec-9a-shanti', b: 'sec-9b-shanti', r1: 'R-109', r2: 'R-110', teacher: null },
+    { classId: 'cls-8-shanti', a: 'sec-8a-shanti', b: 'sec-8b-shanti', r1: 'R-107', r2: 'R-108', teacher: null },
+    { classId: 'cls-7-shanti', a: 'sec-7a-shanti', b: 'sec-7b-shanti', r1: 'R-105', r2: 'R-106', teacher: null },
+    { classId: 'cls-6-shanti', a: 'sec-6a-shanti', b: 'sec-6b-shanti', r1: 'R-103', r2: 'R-104', teacher: null },
+    { classId: 'cls-5-shanti', a: 'sec-5a-shanti', b: 'sec-5b-shanti', r1: 'R-101', r2: 'R-102', teacher: null }
+  ];
+
+  const secInsert = db.prepare(`INSERT INTO sections (id, tenant_id, class_id, name, room_number, class_teacher_id, capacity) VALUES (?, ?, ?, ?, ?, ?, 40)`);
+  for (const s of seedSections) {
+    secInsert.run(s.a, tenant1Id, s.classId, 'Section A (सगरमाथा)', s.r1, s.teacher);
+    secInsert.run(s.b, tenant1Id, s.classId, 'Section B (कञ्चनजङ्घा)', s.r2, null);
+  }
 
   // Subjects for Grade 10 conforming strictly to Nepal CDC Curriculum
   const subjectsGrade10 = [
@@ -1104,9 +1126,91 @@ function seedDentalData() {
   }
 }
 
+function ensureClassSections() {
+  try {
+    const classesWithoutSections = db.prepare(`
+      SELECT c.id, c.tenant_id, c.name, c.nepali_name, c.display_order
+      FROM classes c
+      WHERE NOT EXISTS (
+        SELECT 1 FROM sections s WHERE s.class_id = c.id AND s.tenant_id = c.tenant_id
+      )
+    `).all();
+
+    if (classesWithoutSections.length > 0) {
+      console.log(`[Database] Found ${classesWithoutSections.length} class(es) without sections. Auto-generating standard sections...`);
+      const insertSec = db.prepare(`
+        INSERT OR IGNORE INTO sections (id, tenant_id, class_id, name, room_number, capacity)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `);
+
+      for (const c of classesWithoutSections) {
+        const secAId = `sec-${c.id}-a`;
+        const secBId = `sec-${c.id}-b`;
+        const roomA = `R-${c.display_order || 1}01`;
+        const roomB = `R-${c.display_order || 1}02`;
+        insertSec.run(secAId, c.tenant_id, c.id, 'Section A (सगरमाथा)', roomA, 40);
+        insertSec.run(secBId, c.tenant_id, c.id, 'Section B (कञ्चनजङ्घा)', roomB, 40);
+      }
+      console.log('[Database] Successfully auto-generated sections for all classes.');
+    }
+  } catch (err) {
+    console.error('[Database] Error in ensureClassSections:', err.message);
+  }
+}
+
+function ensureStudentAddressColumns() {
+  try {
+    const tableInfo = db.prepare('PRAGMA table_info(students)').all();
+    const colNames = new Set(tableInfo.map(c => c.name));
+
+    const newCols = [
+      { name: 'student_phone', def: 'TEXT' },
+      { name: 'permanent_province', def: 'TEXT' },
+      { name: 'permanent_district', def: 'TEXT' },
+      { name: 'permanent_municipality', def: 'TEXT' },
+      { name: 'permanent_ward', def: 'TEXT' },
+      { name: 'permanent_tole', def: 'TEXT' },
+      { name: 'temporary_province', def: 'TEXT' },
+      { name: 'temporary_district', def: 'TEXT' },
+      { name: 'temporary_municipality', def: 'TEXT' },
+      { name: 'temporary_ward', def: 'TEXT' },
+      { name: 'temporary_tole', def: 'TEXT' },
+      { name: 'same_as_permanent', def: 'INTEGER DEFAULT 1' }
+    ];
+
+    for (const col of newCols) {
+      if (!colNames.has(col.name)) {
+        db.exec(`ALTER TABLE students ADD COLUMN ${col.name} ${col.def};`);
+        console.log(`[Database] Added column ${col.name} to students table.`);
+      }
+    }
+
+    // Backfill permanent and temporary address from legacy columns if null
+    db.exec(`
+      UPDATE students
+      SET permanent_province = COALESCE(permanent_province, province, 'बागमती प्रदेश'),
+          permanent_district = COALESCE(permanent_district, district, 'ललितपुर'),
+          permanent_municipality = COALESCE(permanent_municipality, municipality, 'ललितपुर महानगरपालिका'),
+          permanent_ward = COALESCE(permanent_ward, ward, '५'),
+          permanent_tole = COALESCE(permanent_tole, tole, ''),
+          temporary_province = COALESCE(temporary_province, province, 'बागमती प्रदेश'),
+          temporary_district = COALESCE(temporary_district, district, 'ललितपुर'),
+          temporary_municipality = COALESCE(temporary_municipality, municipality, 'ललितपुर महानगरपालिका'),
+          temporary_ward = COALESCE(temporary_ward, ward, '५'),
+          temporary_tole = COALESCE(temporary_tole, tole, ''),
+          same_as_permanent = COALESCE(same_as_permanent, 1)
+      WHERE permanent_province IS NULL;
+    `);
+  } catch (err) {
+    console.error('[Database] Error in ensureStudentAddressColumns:', err.message);
+  }
+}
+
 initSchema();
 seedInitialData();
 seedDentalData();
+ensureClassSections();
+ensureStudentAddressColumns();
 
 module.exports = {
   db,

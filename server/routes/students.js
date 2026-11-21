@@ -17,8 +17,11 @@ router.get('/', authenticateToken, (req, res) => {
   let query = `
     SELECT 
       s.id, s.admission_number, s.roll_number, s.current_class_id, s.current_section_id,
-      s.first_name, s.last_name, s.full_name_nepali, s.gender, s.dob_bs, s.dob_ad,
+      s.first_name, s.last_name, s.full_name_nepali, s.student_phone, s.gender, s.dob_bs, s.dob_ad,
       s.blood_group, s.caste_ethnicity, s.religion, s.mother_tongue, s.disability_status,
+      s.permanent_province, s.permanent_district, s.permanent_municipality, s.permanent_ward, s.permanent_tole,
+      s.temporary_province, s.temporary_district, s.temporary_municipality, s.temporary_ward, s.temporary_tole,
+      s.same_as_permanent,
       s.province, s.district, s.municipality, s.ward, s.tole,
       s.father_name, s.mother_name, s.guardian_name, s.guardian_phone,
       s.status, s.enrollment_date_bs,
@@ -60,10 +63,11 @@ router.get('/', authenticateToken, (req, res) => {
       s.last_name LIKE ? OR 
       s.full_name_nepali LIKE ? OR 
       s.admission_number LIKE ? OR
+      s.student_phone LIKE ? OR
       s.guardian_phone LIKE ?
     )`;
     const sTerm = `%${search}%`;
-    params.push(sTerm, sTerm, sTerm, sTerm, sTerm);
+    params.push(sTerm, sTerm, sTerm, sTerm, sTerm, sTerm);
   }
 
   query += ' ORDER BY c.display_order ASC, s.roll_number ASC, s.first_name ASC';
@@ -123,16 +127,34 @@ router.post('/', authenticateToken, requireRoles('school_admin', 'super_admin'),
   const tenantId = req.tenantId;
   const {
     admission_number, roll_number, current_class_id, current_section_id,
-    first_name, last_name, full_name_nepali, gender, dob_bs, dob_ad,
+    first_name, last_name, full_name_nepali, student_phone, gender, dob_bs, dob_ad,
     blood_group, caste_ethnicity, religion, mother_tongue, disability_status,
-    inclusion_support_notes, previous_school, province, district, municipality,
-    ward, tole, father_name, father_phone, mother_name, mother_phone,
+    inclusion_support_notes, previous_school,
+    permanent_province, permanent_district, permanent_municipality, permanent_ward, permanent_tole,
+    temporary_province, temporary_district, temporary_municipality, temporary_ward, temporary_tole,
+    same_as_permanent,
+    province, district, municipality, ward, tole,
+    father_name, father_phone, mother_name, mother_phone,
     guardian_name, guardian_phone, emergency_contact, enrollment_date_bs
   } = req.body;
 
   if (!first_name || !last_name || !current_class_id || !current_section_id || !dob_bs || !caste_ethnicity) {
     return res.status(400).json({ error: 'Please provide all mandatory admission fields (सबै अनिवार्य विवरण भर्नुहोस्)' });
   }
+
+  // Address resolution
+  const permProv = permanent_province || province || 'बागमती प्रदेश';
+  const permDist = permanent_district || district || 'ललितपुर';
+  const permMun = permanent_municipality || municipality || 'ललितपुर महानगरपालिका';
+  const permWard = permanent_ward || ward || '५';
+  const permTole = permanent_tole || tole || '';
+
+  const isSame = (same_as_permanent === undefined || same_as_permanent === null || same_as_permanent === true || same_as_permanent === 1) ? 1 : 0;
+  const tempProv = isSame ? permProv : (temporary_province || permProv);
+  const tempDist = isSame ? permDist : (temporary_district || permDist);
+  const tempMun = isSame ? permMun : (temporary_municipality || permMun);
+  const tempWard = isSame ? permWard : (temporary_ward || permWard);
+  const tempTole = isSame ? permTole : (temporary_tole || permTole);
 
   // Auto-generate admission number if not provided
   let admNo = admission_number;
@@ -148,20 +170,27 @@ router.post('/', authenticateToken, requireRoles('school_admin', 'super_admin'),
     db.prepare(`
       INSERT INTO students (
         id, tenant_id, admission_number, roll_number, current_class_id, current_section_id,
-        first_name, last_name, full_name_nepali, gender, dob_bs, dob_ad,
+        first_name, last_name, full_name_nepali, student_phone, gender, dob_bs, dob_ad,
         blood_group, caste_ethnicity, religion, mother_tongue, disability_status,
-        inclusion_support_notes, previous_school, province, district, municipality,
-        ward, tole, father_name, father_phone, mother_name, mother_phone,
+        inclusion_support_notes, previous_school,
+        permanent_province, permanent_district, permanent_municipality, permanent_ward, permanent_tole,
+        temporary_province, temporary_district, temporary_municipality, temporary_ward, temporary_tole,
+        same_as_permanent,
+        province, district, municipality, ward, tole,
+        father_name, father_phone, mother_name, mother_phone,
         guardian_name, guardian_phone, emergency_contact, status, enrollment_date_bs
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enrolled', ?)
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'enrolled', ?)
     `).run(
       studentId, tenantId, admNo, roll_number || null, current_class_id, current_section_id,
-      first_name, last_name, full_name_nepali || `${first_name} ${last_name}`, gender || 'male',
+      first_name, last_name, full_name_nepali || `${first_name} ${last_name}`, student_phone || null, gender || 'male',
       dob_bs, dob_ad || null, blood_group || null, caste_ethnicity || 'Other',
       religion || 'Hindu', mother_tongue || 'Nepali', disability_status || 'none',
       inclusion_support_notes || null, previous_school || null,
-      province || 'बागमती प्रदेश', district || 'ललितपुर', municipality || 'ललितपुर महानगरपालिका',
-      ward || '५', tole || '', father_name || null, father_phone || null,
+      permProv, permDist, permMun, permWard, permTole,
+      tempProv, tempDist, tempMun, tempWard, tempTole,
+      isSame,
+      permProv, permDist, permMun, permWard, permTole,
+      father_name || null, father_phone || null,
       mother_name || null, mother_phone || null, guardian_name || father_name || first_name,
       guardian_phone || father_phone || null, emergency_contact || guardian_phone || null,
       enrollment_date_bs || '2081-01-10'
@@ -190,12 +219,23 @@ router.put('/:id', authenticateToken, requireRoles('school_admin', 'super_admin'
 
   const {
     roll_number, current_class_id, current_section_id,
-    first_name, last_name, full_name_nepali, gender, dob_bs, dob_ad,
+    first_name, last_name, full_name_nepali, student_phone, gender, dob_bs, dob_ad,
     blood_group, caste_ethnicity, religion, mother_tongue, disability_status,
-    inclusion_support_notes, previous_school, province, district, municipality,
-    ward, tole, father_name, father_phone, mother_name, mother_phone,
+    inclusion_support_notes, previous_school,
+    permanent_province, permanent_district, permanent_municipality, permanent_ward, permanent_tole,
+    temporary_province, temporary_district, temporary_municipality, temporary_ward, temporary_tole,
+    same_as_permanent,
+    province, district, municipality, ward, tole,
+    father_name, father_phone, mother_name, mother_phone,
     guardian_name, guardian_phone, emergency_contact, status
   } = req.body;
+
+  const isSame = same_as_permanent !== undefined ? (same_as_permanent ? 1 : 0) : null;
+  const permProv = permanent_province !== undefined ? permanent_province : province;
+  const permDist = permanent_district !== undefined ? permanent_district : district;
+  const permMun = permanent_municipality !== undefined ? permanent_municipality : municipality;
+  const permWard = permanent_ward !== undefined ? permanent_ward : ward;
+  const permTole = permanent_tole !== undefined ? permanent_tole : tole;
 
   try {
     db.prepare(`
@@ -206,6 +246,7 @@ router.put('/:id', authenticateToken, requireRoles('school_admin', 'super_admin'
         first_name = COALESCE(?, first_name),
         last_name = COALESCE(?, last_name),
         full_name_nepali = COALESCE(?, full_name_nepali),
+        student_phone = COALESCE(?, student_phone),
         gender = COALESCE(?, gender),
         dob_bs = COALESCE(?, dob_bs),
         dob_ad = COALESCE(?, dob_ad),
@@ -216,6 +257,17 @@ router.put('/:id', authenticateToken, requireRoles('school_admin', 'super_admin'
         disability_status = COALESCE(?, disability_status),
         inclusion_support_notes = COALESCE(?, inclusion_support_notes),
         previous_school = COALESCE(?, previous_school),
+        permanent_province = COALESCE(?, permanent_province),
+        permanent_district = COALESCE(?, permanent_district),
+        permanent_municipality = COALESCE(?, permanent_municipality),
+        permanent_ward = COALESCE(?, permanent_ward),
+        permanent_tole = COALESCE(?, permanent_tole),
+        temporary_province = COALESCE(?, temporary_province),
+        temporary_district = COALESCE(?, temporary_district),
+        temporary_municipality = COALESCE(?, temporary_municipality),
+        temporary_ward = COALESCE(?, temporary_ward),
+        temporary_tole = COALESCE(?, temporary_tole),
+        same_as_permanent = COALESCE(?, same_as_permanent),
         province = COALESCE(?, province),
         district = COALESCE(?, district),
         municipality = COALESCE(?, municipality),
@@ -232,10 +284,14 @@ router.put('/:id', authenticateToken, requireRoles('school_admin', 'super_admin'
       WHERE id = ? AND tenant_id = ?
     `).run(
       roll_number, current_class_id, current_section_id,
-      first_name, last_name, full_name_nepali, gender, dob_bs, dob_ad,
+      first_name, last_name, full_name_nepali, student_phone, gender, dob_bs, dob_ad,
       blood_group, caste_ethnicity, religion, mother_tongue, disability_status,
-      inclusion_support_notes, previous_school, province, district, municipality,
-      ward, tole, father_name, father_phone, mother_name, mother_phone,
+      inclusion_support_notes, previous_school,
+      permProv, permDist, permMun, permWard, permTole,
+      temporary_province, temporary_district, temporary_municipality, temporary_ward, temporary_tole,
+      isSame,
+      permProv, permDist, permMun, permWard, permTole,
+      father_name, father_phone, mother_name, mother_phone,
       guardian_name, guardian_phone, emergency_contact, status,
       studentId, tenantId
     );

@@ -219,8 +219,10 @@ export default function AttendanceView({
                 const cid = e.target.value;
                 setSelectedClass(cid);
                 const cObj = classes.find(c => c.id === cid);
-                if (cObj && cObj.sections.length > 0) {
+                if (cObj && cObj.sections && cObj.sections.length > 0) {
                   setSelectedSection(cObj.sections[0].id);
+                } else {
+                  setSelectedSection('');
                 }
               }}
               className="form-select"
@@ -241,9 +243,13 @@ export default function AttendanceView({
               onChange={(e) => setSelectedSection(e.target.value)}
               className="form-select"
             >
-              {currentClassObj?.sections?.map(s => (
-                <option key={s.id} value={s.id}>{s.name} ({s.room_number || 'Room'})</option>
-              ))}
+              {currentClassObj?.sections && currentClassObj.sections.length > 0 ? (
+                currentClassObj.sections.map(s => (
+                  <option key={s.id} value={s.id}>{s.name} ({s.room_number || 'Room'})</option>
+                ))
+              ) : (
+                <option value="">{lang === 'ne' ? '-- खण्ड उपलब्ध छैन --' : '-- No sections available --'}</option>
+              )}
             </select>
           </div>
 

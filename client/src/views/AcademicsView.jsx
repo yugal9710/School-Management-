@@ -546,7 +546,9 @@ export default function AcademicsView({ token, lang = 'ne', tenant, user }) {
                   <span>
                     {lang === 'ne' ? 'कुल खण्डहरू (Sections):' : 'Sections:'}{' '}
                     <strong style={{ color: '#334155' }}>
-                      {selectedClass.sections ? selectedClass.sections.map(s => s.name).join(', ') : 'None'}
+                      {selectedClass.sections && selectedClass.sections.length > 0
+                        ? selectedClass.sections.map(s => s.name).join(', ')
+                        : (lang === 'ne' ? 'खण्ड उपलब्ध छैन' : 'None')}
                     </strong>
                   </span>
                   <span>|</span>

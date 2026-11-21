@@ -13,7 +13,13 @@ import {
   ShieldCheck,
   MapPin
 } from 'lucide-react';
-import { translations, NEPAL_PROVINCES, NEPAL_DISTRICTS, ETHNICITY_OPTIONS, DISABILITY_OPTIONS } from '../utils/translations';
+import { translations, ETHNICITY_OPTIONS, DISABILITY_OPTIONS } from '../utils/translations';
+import {
+  NEPAL_PROVINCES,
+  getDistrictsByProvince,
+  getLocalLevelsByDistrict,
+  getWardsByLocalLevel
+} from '../utils/nepalAdministrativeData';
 import { toNepaliDigits } from '../utils/nepaliDate';
 import NepaliDatePicker from '../components/NepaliDatePicker';
 
@@ -35,6 +41,7 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
     first_name: '',
     last_name: '',
     full_name_nepali: '',
+    student_phone: '',
     gender: 'male',
     dob_bs: '2067-04-15',
     dob_ad: '2010-07-30',
@@ -45,11 +52,20 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
     inclusion_support_notes: '',
     current_class_id: '',
     current_section_id: '',
-    province: 'बागमती प्रदेश',
-    district: 'ललितपुर',
-    municipality: 'ललितपुर महानगरपालिका',
-    ward: '५',
-    tole: '',
+    // Permanent Address Hierarchy
+    permanent_province: 'Bagmati',
+    permanent_district: 'Lalitpur',
+    permanent_municipality: 'Lalitpur',
+    permanent_ward: '5',
+    permanent_tole: 'महालक्ष्मीस्थान',
+    // Same as Permanent flag
+    same_as_permanent: true,
+    // Temporary Address Hierarchy
+    temporary_province: 'Bagmati',
+    temporary_district: 'Lalitpur',
+    temporary_municipality: 'Lalitpur',
+    temporary_ward: '5',
+    temporary_tole: 'महालक्ष्मीस्थान',
     father_name: '',
     father_phone: '',
     mother_name: '',
@@ -57,10 +73,175 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
     guardian_phone: ''
   });
 
+  // Handlers for Dependent Local-Level Hierarchy
+  const handlePermanentProvinceChange = (newProv) => {
+    const districts = getDistrictsByProvince(newProv);
+    const firstDist = districts[0]?.id || '';
+    const localLevels = getLocalLevelsByDistrict(newProv, firstDist);
+    const firstLL = localLevels[0]?.name || '';
+    const wards = getWardsByLocalLevel(newProv, firstDist, firstLL);
+    const firstWard = wards[0] ? String(wards[0]) : '1';
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        permanent_province: newProv,
+        permanent_district: firstDist,
+        permanent_municipality: firstLL,
+        permanent_ward: firstWard
+      };
+      if (prev.same_as_permanent) {
+        updated.temporary_province = newProv;
+        updated.temporary_district = firstDist;
+        updated.temporary_municipality = firstLL;
+        updated.temporary_ward = firstWard;
+      }
+      return updated;
+    });
+  };
+
+  const handlePermanentDistrictChange = (newDist) => {
+    const localLevels = getLocalLevelsByDistrict(formData.permanent_province, newDist);
+    const firstLL = localLevels[0]?.name || '';
+    const wards = getWardsByLocalLevel(formData.permanent_province, newDist, firstLL);
+    const firstWard = wards[0] ? String(wards[0]) : '1';
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        permanent_district: newDist,
+        permanent_municipality: firstLL,
+        permanent_ward: firstWard
+      };
+      if (prev.same_as_permanent) {
+        updated.temporary_district = newDist;
+        updated.temporary_municipality = firstLL;
+        updated.temporary_ward = firstWard;
+      }
+      return updated;
+    });
+  };
+
+  const handlePermanentMunicipalityChange = (newLL) => {
+    const wards = getWardsByLocalLevel(formData.permanent_province, formData.permanent_district, newLL);
+    const firstWard = wards[0] ? String(wards[0]) : '1';
+
+    setFormData(prev => {
+      const updated = {
+        ...prev,
+        permanent_municipality: newLL,
+        permanent_ward: firstWard
+      };
+      if (prev.same_as_permanent) {
+        updated.temporary_municipality = newLL;
+        updated.temporary_ward = firstWard;
+      }
+      return updated;
+    });
+  };
+
+  const handlePermanentWardChange = (newWard) => {
+    setFormData(prev => {
+      const updated = { ...prev, permanent_ward: newWard };
+      if (prev.same_as_permanent) {
+        updated.temporary_ward = newWard;
+      }
+      return updated;
+    });
+  };
+
+  const handlePermanentToleChange = (newTole) => {
+    setFormData(prev => {
+      const updated = { ...prev, permanent_tole: newTole };
+      if (prev.same_as_permanent) {
+        updated.temporary_tole = newTole;
+      }
+      return updated;
+    });
+  };
+
+  const handleSameAsPermanentToggle = (checked) => {
+    setFormData(prev => {
+      const updated = { ...prev, same_as_permanent: checked };
+      if (checked) {
+        updated.temporary_province = prev.permanent_province;
+        updated.temporary_district = prev.permanent_district;
+        updated.temporary_municipality = prev.permanent_municipality;
+        updated.temporary_ward = prev.permanent_ward;
+        updated.temporary_tole = prev.permanent_tole;
+      }
+      return updated;
+    });
+  };
+
+  // Handlers for Temporary Address
+  const handleTemporaryProvinceChange = (newProv) => {
+    const districts = getDistrictsByProvince(newProv);
+    const firstDist = districts[0]?.id || '';
+    const localLevels = getLocalLevelsByDistrict(newProv, firstDist);
+    const firstLL = localLevels[0]?.name || '';
+    const wards = getWardsByLocalLevel(newProv, firstDist, firstLL);
+    const firstWard = wards[0] ? String(wards[0]) : '1';
+
+    setFormData(prev => ({
+      ...prev,
+      temporary_province: newProv,
+      temporary_district: firstDist,
+      temporary_municipality: firstLL,
+      temporary_ward: firstWard
+    }));
+  };
+
+  const handleTemporaryDistrictChange = (newDist) => {
+    const localLevels = getLocalLevelsByDistrict(formData.temporary_province, newDist);
+    const firstLL = localLevels[0]?.name || '';
+    const wards = getWardsByLocalLevel(formData.temporary_province, newDist, firstLL);
+    const firstWard = wards[0] ? String(wards[0]) : '1';
+
+    setFormData(prev => ({
+      ...prev,
+      temporary_district: newDist,
+      temporary_municipality: firstLL,
+      temporary_ward: firstWard
+    }));
+  };
+
+  const handleTemporaryMunicipalityChange = (newLL) => {
+    const wards = getWardsByLocalLevel(formData.temporary_province, formData.temporary_district, newLL);
+    const firstWard = wards[0] ? String(wards[0]) : '1';
+
+    setFormData(prev => ({
+      ...prev,
+      temporary_municipality: newLL,
+      temporary_ward: firstWard
+    }));
+  };
+
+  const handleTemporaryWardChange = (newWard) => {
+    setFormData(prev => ({ ...prev, temporary_ward: newWard }));
+  };
+
+  const handleTemporaryToleChange = (newTole) => {
+    setFormData(prev => ({ ...prev, temporary_tole: newTole }));
+  };
+
   useEffect(() => {
     fetchClasses();
     fetchStudents();
   }, [selectedClass, selectedCaste, searchTerm]);
+
+  // Ensure current_section_id stays synced whenever class or classes change
+  useEffect(() => {
+    if (classes.length > 0 && formData.current_class_id) {
+      const cls = classes.find(c => c.id === formData.current_class_id);
+      if (cls && cls.sections && cls.sections.length > 0) {
+        const hasValidSec = cls.sections.some(s => s.id === formData.current_section_id);
+        if (!hasValidSec) {
+          setFormData(prev => ({ ...prev, current_section_id: cls.sections[0].id }));
+        }
+      }
+    }
+  }, [formData.current_class_id, classes]);
 
   const fetchClasses = async () => {
     try {
@@ -70,12 +251,17 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
       if (res.ok) {
         const data = await res.json();
         setClasses(data);
-        if (data.length > 0 && !formData.current_class_id) {
-          setFormData(prev => ({
-            ...prev,
-            current_class_id: data[0].id,
-            current_section_id: data[0].sections && data[0].sections[0] ? data[0].sections[0].id : ''
-          }));
+        if (data.length > 0) {
+          setClasses(data);
+          setFormData(prev => {
+            const activeClass = data.find(c => c.id === prev.current_class_id) || data[0];
+            const activeSec = activeClass?.sections?.find(s => s.id === prev.current_section_id)?.id || activeClass?.sections?.[0]?.id || '';
+            return {
+              ...prev,
+              current_class_id: activeClass.id,
+              current_section_id: activeSec
+            };
+          });
         }
       }
     } catch (err) {
@@ -160,7 +346,21 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
 
         <div style={{ display: 'flex', gap: '0.6rem' }}>
           {['school_admin', 'super_admin'].includes(user?.role) && (
-            <button onClick={() => setShowAddModal(true)} className="btn btn-primary">
+            <button
+              onClick={() => {
+                if (classes.length > 0) {
+                  const targetClass = classes.find(c => c.id === formData.current_class_id) || classes[0];
+                  const targetSec = targetClass?.sections?.find(s => s.id === formData.current_section_id)?.id || targetClass?.sections?.[0]?.id || '';
+                  setFormData(prev => ({
+                    ...prev,
+                    current_class_id: targetClass.id,
+                    current_section_id: targetSec
+                  }));
+                }
+                setShowAddModal(true);
+              }}
+              className="btn btn-primary"
+            >
               <Plus size={16} />
               {lang === 'ne' ? 'नयाँ विद्यार्थी भर्ना' : 'New Admission'}
             </button>
@@ -354,6 +554,7 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
                 <div><strong>रक्त समूह (Blood Group):</strong> {selectedStudentProfile.blood_group || '-'}</div>
                 <div><strong>जात/जाति समूह:</strong> {selectedStudentProfile.caste_ethnicity}</div>
                 <div><strong>मातृभाषा:</strong> {selectedStudentProfile.mother_tongue || 'नेपाली'}</div>
+                <div><strong>विद्यार्थीको फोन (Student Phone):</strong> {selectedStudentProfile.student_phone || '-'}</div>
                 <div><strong>बुवाको नाम:</strong> {selectedStudentProfile.father_name || '-'}</div>
                 <div><strong>आमाको नाम:</strong> {selectedStudentProfile.mother_name || '-'}</div>
                 <div><strong>अभिभावकको नाम:</strong> {selectedStudentProfile.guardian_name || '-'}</div>
@@ -362,13 +563,19 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
 
               {/* Nepal Federal Address */}
               <h4 style={{ fontSize: '0.9rem', fontWeight: 700, color: '#1e3a8a', borderBottom: '1px solid #e2e8f0', paddingBottom: '0.35rem', marginBottom: '0.75rem' }}>
-                स्थायी ठेगाना (Federal Address Structure)
+                ठेगाना विवरण (Federal Address Hierarchy)
               </h4>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1rem', marginBottom: '1.25rem' }}>
-                <div><strong>प्रदेश (Province):</strong> {selectedStudentProfile.province}</div>
-                <div><strong>जिल्ला (District):</strong> {selectedStudentProfile.district}</div>
-                <div><strong>स्थानीय तह (Municipality):</strong> {selectedStudentProfile.municipality}</div>
-                <div><strong>वडा नं. (Ward):</strong> {selectedStudentProfile.ward} (टोल: {selectedStudentProfile.tole || '-'})</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem 1rem', marginBottom: '0.5rem' }}>
+                <div><strong>स्थायी प्रदेश (Permanent Province):</strong> {selectedStudentProfile.permanent_province || selectedStudentProfile.province}</div>
+                <div><strong>स्थायी जिल्ला (District):</strong> {selectedStudentProfile.permanent_district || selectedStudentProfile.district}</div>
+                <div><strong>स्थानीय तह (Municipality):</strong> {selectedStudentProfile.permanent_municipality || selectedStudentProfile.municipality}</div>
+                <div><strong>वडा नं. (Ward):</strong> {selectedStudentProfile.permanent_ward || selectedStudentProfile.ward} (टोल: {selectedStudentProfile.permanent_tole || selectedStudentProfile.tole || '-'})</div>
+              </div>
+              <div style={{ backgroundColor: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.5rem 0.75rem', borderRadius: '4px', fontSize: '0.8rem', color: '#475569', marginBottom: '1.25rem' }}>
+                <strong>अस्थायी / हालको ठेगाना:</strong>{' '}
+                {selectedStudentProfile.same_as_permanent
+                  ? 'स्थायी ठेगाना सरह (Same as Permanent Address)'
+                  : `${selectedStudentProfile.temporary_province || selectedStudentProfile.province || '-'}, ${selectedStudentProfile.temporary_district || selectedStudentProfile.district || '-'}, ${selectedStudentProfile.temporary_municipality || selectedStudentProfile.municipality || '-'}, वडा नं. ${selectedStudentProfile.temporary_ward || selectedStudentProfile.ward || '-'} (${selectedStudentProfile.temporary_tole || selectedStudentProfile.tole || '-'})`}
               </div>
 
               {/* Sensitive Inclusion & Disability Notes */}
@@ -435,10 +642,11 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
                       onChange={(e) => {
                         const cid = e.target.value;
                         const cObj = classes.find(c => c.id === cid);
+                        const firstSec = cObj?.sections && cObj.sections.length > 0 ? cObj.sections[0].id : '';
                         setFormData(prev => ({
                           ...prev,
                           current_class_id: cid,
-                          current_section_id: cObj && cObj.sections[0] ? cObj.sections[0].id : ''
+                          current_section_id: firstSec
                         }));
                       }}
                       className="form-select"
@@ -454,16 +662,41 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
                     <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
                       खण्ड (Section) *
                     </label>
-                    <select
-                      value={formData.current_section_id}
-                      onChange={(e) => setFormData(prev => ({ ...prev, current_section_id: e.target.value }))}
-                      className="form-select"
-                      required
-                    >
-                      {classes.find(c => c.id === formData.current_class_id)?.sections?.map(s => (
-                        <option key={s.id} value={s.id}>{s.name}</option>
-                      )) || <option value="">Default Section</option>}
-                    </select>
+                    {(() => {
+                      const selectedClassObj = classes.find(c => c.id === formData.current_class_id);
+                      const availableSections = selectedClassObj?.sections || [];
+                      return (
+                        <>
+                          <select
+                            value={formData.current_section_id}
+                            onChange={(e) => setFormData(prev => ({ ...prev, current_section_id: e.target.value }))}
+                            className="form-select"
+                            required
+                          >
+                            {availableSections.length === 0 ? (
+                              <option value="" disabled>
+                                {lang === 'ne' ? '-- खण्ड उपलब्ध छैन --' : '-- No sections available --'}
+                              </option>
+                            ) : (
+                              availableSections.map(s => (
+                                <option key={s.id} value={s.id}>
+                                  {s.name} {s.room_number ? `(${s.room_number})` : ''}
+                                </option>
+                              ))
+                            )}
+                          </select>
+                          <small style={{ color: '#64748b', fontSize: '0.72rem', marginTop: '0.25rem', display: 'block' }}>
+                            {availableSections.length > 0
+                              ? (lang === 'ne'
+                                  ? `${toNepaliDigits(availableSections.length)} वटा खण्ड उपलब्ध`
+                                  : `${availableSections.length} section(s) available`)
+                              : (lang === 'ne'
+                                  ? 'यस कक्षाको लागि खण्ड फेला परेन'
+                                  : 'No sections configured')}
+                          </small>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
 
@@ -513,7 +746,7 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr 1fr 1.2fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <div>
                     <NepaliDatePicker
                       label="जन्म मिति वि.सं. (DOB in BS)"
@@ -555,6 +788,18 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
                       <option value="AB+">AB+</option>
                       <option value="AB-">AB-</option>
                     </select>
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      {lang === 'ne' ? 'विद्यार्थीको फोन (Student Phone)' : 'Student Phone'}
+                    </label>
+                    <input
+                      type="text"
+                      className="form-input"
+                      placeholder="98XXXXXXXX"
+                      value={formData.student_phone}
+                      onChange={(e) => setFormData({ ...formData, student_phone: e.target.value })}
+                    />
                   </div>
                 </div>
 
@@ -623,35 +868,39 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
                   />
                 </div>
 
-                {/* Nepal Federal Address */}
+                {/* 4. Nepal Permanent Federal Address */}
                 <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e3a8a', marginBottom: '0.6rem' }}>
-                  ४. संघीय नेपालको ठेगाना (Federal Address Hierarchy)
+                  ४. स्थायी ठेगाना (Permanent Address)
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>प्रदेश (Province) *</label>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      प्रदेश (Province) *
+                    </label>
                     <select
                       className="form-select"
-                      value={formData.province}
-                      onChange={(e) => setFormData({ ...formData, province: e.target.value })}
+                      value={formData.permanent_province}
+                      onChange={(e) => handlePermanentProvinceChange(e.target.value)}
                       required
                     >
                       {NEPAL_PROVINCES.map(p => (
-                        <option key={p.code} value={p.nameNe}>{p.nameNe}</option>
+                        <option key={p.id} value={p.id}>{p.display}</option>
                       ))}
                     </select>
                   </div>
 
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>जिल्ला (District) *</label>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      जिल्ला (District) *
+                    </label>
                     <select
                       className="form-select"
-                      value={formData.district}
-                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                      value={formData.permanent_district}
+                      onChange={(e) => handlePermanentDistrictChange(e.target.value)}
                       required
                     >
-                      {NEPAL_DISTRICTS.map(d => (
-                        <option key={d} value={d}>{d}</option>
+                      {getDistrictsByProvince(formData.permanent_province).map(d => (
+                        <option key={d.id} value={d.id}>{d.display}</option>
                       ))}
                     </select>
                   </div>
@@ -659,39 +908,191 @@ export default function StudentsView({ token, lang = 'ne', tenant, user }) {
 
                 <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.5fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>स्थानीय तह (Municipality) *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={formData.municipality}
-                      onChange={(e) => setFormData({ ...formData, municipality: e.target.value })}
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      स्थानीय तह / पालिका (Municipality) *
+                    </label>
+                    <select
+                      className="form-select"
+                      value={formData.permanent_municipality}
+                      onChange={(e) => handlePermanentMunicipalityChange(e.target.value)}
                       required
-                    />
+                    >
+                      {getLocalLevelsByDistrict(formData.permanent_province, formData.permanent_district).map(ll => (
+                        <option key={ll.name} value={ll.name}>{ll.display}</option>
+                      ))}
+                    </select>
                   </div>
+
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>वडा नं. (Ward) *</label>
-                    <input
-                      type="text"
-                      className="form-input"
-                      value={formData.ward}
-                      onChange={(e) => setFormData({ ...formData, ward: e.target.value })}
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      वडा नं. (Ward) *
+                    </label>
+                    <select
+                      className="form-select"
+                      value={formData.permanent_ward}
+                      onChange={(e) => handlePermanentWardChange(e.target.value)}
                       required
-                    />
+                    >
+                      {getWardsByLocalLevel(formData.permanent_province, formData.permanent_district, formData.permanent_municipality).map(w => (
+                        <option key={w} value={String(w)}>
+                          {lang === 'ne' ? `वडा नं. ${toNepaliDigits(w)}` : `Ward No. ${w}`}
+                        </option>
+                      ))}
+                    </select>
                   </div>
+
                   <div>
-                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>टोल / ठेगाना (Tole/Village)</label>
+                    <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                      टोल / ठेगाना (Tole/Village)
+                    </label>
                     <input
                       type="text"
                       className="form-input"
-                      value={formData.tole}
-                      onChange={(e) => setFormData({ ...formData, tole: e.target.value })}
+                      placeholder="उदा: महालक्ष्मीस्थान, कोटेश्वर"
+                      value={formData.permanent_tole}
+                      onChange={(e) => handlePermanentToleChange(e.target.value)}
                     />
                   </div>
                 </div>
 
-                {/* Parents & Guardians */}
+                {/* 5. Nepal Temporary Address & Same as Permanent Checkbox */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.6rem' }}>
+                  <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e3a8a', margin: 0 }}>
+                    ५. अस्थायी / हालको ठेगाना (Temporary / Current Address)
+                  </h4>
+                  <label style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    cursor: 'pointer',
+                    userSelect: 'none',
+                    fontSize: '0.8rem',
+                    fontWeight: 600,
+                    backgroundColor: '#eff6ff',
+                    padding: '0.35rem 0.65rem',
+                    borderRadius: '6px',
+                    border: '1px solid #bfdbfe',
+                    color: '#1d4ed8'
+                  }}>
+                    <input
+                      type="checkbox"
+                      checked={formData.same_as_permanent}
+                      onChange={(e) => handleSameAsPermanentToggle(e.target.checked)}
+                      style={{ width: '16px', height: '16px', cursor: 'pointer', accentColor: '#2563eb' }}
+                    />
+                    <span>{lang === 'ne' ? 'स्थायी र अस्थायी ठेगाना एउटै छ (Same as permanent)' : 'Same as permanent address'}</span>
+                  </label>
+                </div>
+
+                {formData.same_as_permanent ? (
+                  <div style={{
+                    backgroundColor: '#f8fafc',
+                    border: '1px dashed #cbd5e1',
+                    borderRadius: '6px',
+                    padding: '0.85rem 1rem',
+                    marginBottom: '1.25rem',
+                    fontSize: '0.82rem',
+                    color: '#475569',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.6rem'
+                  }}>
+                    <MapPin size={18} color="#2563eb" />
+                    <div>
+                      <strong>{lang === 'ne' ? 'स्थायी ठेगाना सरह स्वचालित सिङ्क भएको छ:' : 'Auto-synced with Permanent Address:'}</strong>{' '}
+                      {formData.permanent_province}, {formData.permanent_district}, {formData.permanent_municipality}, वडा नं. {toNepaliDigits(formData.permanent_ward)} {formData.permanent_tole ? `(${formData.permanent_tole})` : ''}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          प्रदेश (Province) *
+                        </label>
+                        <select
+                          className="form-select"
+                          value={formData.temporary_province}
+                          onChange={(e) => handleTemporaryProvinceChange(e.target.value)}
+                          required
+                        >
+                          {NEPAL_PROVINCES.map(p => (
+                            <option key={p.id} value={p.id}>{p.display}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          जिल्ला (District) *
+                        </label>
+                        <select
+                          className="form-select"
+                          value={formData.temporary_district}
+                          onChange={(e) => handleTemporaryDistrictChange(e.target.value)}
+                          required
+                        >
+                          {getDistrictsByProvince(formData.temporary_province).map(d => (
+                            <option key={d.id} value={d.id}>{d.display}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr 1.5fr', gap: '0.75rem', marginBottom: '1.25rem' }}>
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          स्थानीय तह / पालिका (Municipality) *
+                        </label>
+                        <select
+                          className="form-select"
+                          value={formData.temporary_municipality}
+                          onChange={(e) => handleTemporaryMunicipalityChange(e.target.value)}
+                          required
+                        >
+                          {getLocalLevelsByDistrict(formData.temporary_province, formData.temporary_district).map(ll => (
+                            <option key={ll.name} value={ll.name}>{ll.display}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          वडा नं. (Ward) *
+                        </label>
+                        <select
+                          className="form-select"
+                          value={formData.temporary_ward}
+                          onChange={(e) => handleTemporaryWardChange(e.target.value)}
+                          required
+                        >
+                          {getWardsByLocalLevel(formData.temporary_province, formData.temporary_district, formData.temporary_municipality).map(w => (
+                            <option key={w} value={String(w)}>
+                              {lang === 'ne' ? `वडा नं. ${toNepaliDigits(w)}` : `Ward No. ${w}`}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label style={{ display: 'block', fontSize: '0.8rem', fontWeight: 600, marginBottom: '0.25rem' }}>
+                          टोल / ठेगाना (Tole/Village)
+                        </label>
+                        <input
+                          type="text"
+                          className="form-input"
+                          placeholder="उदा: नयाँ बानेश्वर, पुतलीसडक"
+                          value={formData.temporary_tole}
+                          onChange={(e) => handleTemporaryToleChange(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                {/* 6. Parents & Guardians */}
                 <h4 style={{ fontSize: '0.85rem', fontWeight: 700, color: '#1e3a8a', marginBottom: '0.6rem' }}>
-                  ५. अभिभावक तथा सम्पर्क विवरण (Parents & Emergency Contact)
+                  ६. अभिभावक तथा सम्पर्क विवरण (Parents & Emergency Contact)
                 </h4>
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                   <div>
